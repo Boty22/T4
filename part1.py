@@ -43,4 +43,24 @@ validation_filename = directory + '\\' + selected_dataset[2]
 
 print(testing_filename)
 training_data = np.loadtxt(training_filename , delimiter = ',')
-training_data = np.loadtxt(training_filename , delimiter = ',')
+testing_data = np.loadtxt(testing_filename , delimiter = ',')
+validation_data = np.loadtxt(validation_filename , delimiter = ',')
+
+#Getting the parameters of the data 
+
+#the number of training examples:
+m = training_data.shape[0]
+
+#the number of variables in the Bayes Net
+n = training_data.shape[1]
+
+#the parameters theta are:
+theta_1 = (training_data.sum(axis = 0)+1)/(m+2)
+log_theta_1 = np.log10(theta_1)
+log_theta_0 = np.log10(1- theta_1)
+
+#Estimation LogLikehood of the testing set:
+
+counting_1 = testing_data.sum(axis = 0)
+counting_0 = m - counting_1
+log_likehood = np.multiply(log_theta_1,counting_1).sum()+np.multiply(log_theta_0,counting_0).sum()
