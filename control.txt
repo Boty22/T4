@@ -1,0 +1,61 @@
+Printing data stats:
+nltcs.ts.data
+(16181, 16)
+nltcs.test.data
+(3236, 16)
+nltcs.valid.data
+(2157, 16)
+msnbc.ts.data
+(291326, 17)
+msnbc.test.data
+(58265, 17)
+msnbc.valid.data
+(38843, 17)
+kdd.ts.data
+(180092, 64)
+kdd.test.data
+(34955, 64)
+kdd.valid.data
+(19907, 64)
+plants.ts.data
+(17412, 69)
+plants.test.data
+(3482, 69)
+plants.valid.data
+(2321, 69)
+baudio.ts.data
+(15000, 100)
+baudio.test.data
+(3000, 100)
+baudio.valid.data
+(2000, 100)
+jester.ts.data
+(9000, 100)
+jester.test.data
+(4116, 100)
+jester.valid.data
+(1000, 100)
+bnetflix.ts.data
+(15000, 100)
+bnetflix.test.data
+(3000, 100)
+bnetflix.valid.data
+(2000, 100)
+accidents.ts.data
+(12758, 111)
+accidents.test.data
+(2551, 111)
+accidents.valid.data
+(1700, 111)
+r52.ts.data
+(6532, 941)
+r52.test.data
+(1540, 941)
+r52.valid.data
+(1028, 941)
+dna.ts.data
+(1600, 180)
+dna.test.data
+(1186, 180)
+dna.valid.data
+(400, 180)
