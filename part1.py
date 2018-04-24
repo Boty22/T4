@@ -28,15 +28,15 @@ baudio = ['baudio.ts.data','baudio.test.data','baudio.valid.data']
 jester = ['jester.ts.data','jester.test.data','jester.valid.data']
 bnetflix = ['bnetflix.ts.data','bnetflix.test.data','bnetflix.valid.data']
 accidents  = ['accidents.ts.data','accidents.test.data','accidents.valid.data']
-r52 = ['r52.ts.data','r52.test.data','r52.valid.data']
+
 dna = ['dna.ts.data','dna.test.data','dna.valid.data']
 
 #Select a number 1-10
-option =  1
 
-options = {1:nltcs, 2:msnbc, 3:kdd, 4:plants, 5:baudio, 6:jester, 7:bnetflix, 8:accidents, 9:r52, 10: dna}
+options = {1:nltcs, 2:msnbc, 3:kdd, 4:plants, 5:baudio, 6:jester, 7:bnetflix, 8:accidents, 9: dna}
+
+option =  8
 selected_dataset = options[option]
-
 training_filename = directory + '\\' +selected_dataset[0]
 testing_filename = directory +  '\\' +selected_dataset[1]
 validation_filename = directory + '\\' + selected_dataset[2]
@@ -64,3 +64,5 @@ log_theta_0 = np.log10(1- theta_1)
 counting_1 = testing_data.sum(axis = 0)
 counting_0 = m - counting_1
 log_likehood = np.multiply(log_theta_1,counting_1).sum()+np.multiply(log_theta_0,counting_0).sum()
+print('For option ', options[option][1],' the Log10 Likehood is: ')
+print(log_likehood)
