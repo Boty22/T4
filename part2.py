@@ -13,8 +13,7 @@ The following datasets are included in "\\data" file
 (6) jester
 (7) bnetflix
 (8) accidents
-(9) r52
-(10) dna
+(9) dna
 
 """
 import numpy as np
@@ -54,84 +53,106 @@ options = {1:nltcs, 2:msnbc, 3:kdd, 4:plants, 5:baudio, 6:jester, 7:bnetflix, 8:
 
 
 
-option =  1
+#option =  1
 
-
-
-
-selected_dataset = options[option]
-training_filename = directory + '\\' +selected_dataset[0]
-testing_filename = directory +  '\\' +selected_dataset[1]
-validation_filename = directory + '\\' + selected_dataset[2]
-
-training_data = np.loadtxt(training_filename , delimiter = ',')
-testing_data = np.loadtxt(testing_filename , delimiter = ',')
-validation_data = np.loadtxt(validation_filename , delimiter = ',')
-
-#Getting the parameters of the data 
-#the number of training examples:
-m = training_data.shape[0]
-#the number of variables in the Bayes Net
-n = training_data.shape[1]
-
-#initialize the mutual information MI, a nxn square matrix with zeros
-MI = np.zeros((n, n))
-#get the indexes of the triangular matrix with 1 offset
-index_of_tri = np.triu_indices(n,1)
-#the parameters theta are:
-p_1 = (training_data.sum(axis = 0)+1)/(m+2)
-p_0 = 1 - p_1
-#Now we build our complete graph with mutual information 
-mut_info_list = []
-for row_index in range(n-1):
-    for column_index in range(row_index+1,n):
-        #We get the mutual information but store the negative because we need the max spanning tree
-        mut_info_list.append(-mutual_info(training_data,row_index,column_index,p_1[row_index],p_1[column_index], m))
-
-MI[index_of_tri] = mut_info_list
-#the algorithm will understand the triangle is undirected
-Tcsr = minimum_spanning_tree(MI)
-#Set the starting porint of the Max Spaning tree as the variable 0
-DFS_tree = depth_first_tree(-Tcsr, 0, directed=False)
-#We extract the dependencies
-a = DFS_tree.todok().items()
-#initialize the Bayes Net
-BN = {}
-BN[0] = np.array([p_0[0], p_1[0]])
-for arrow in a:
-    #specifie the index of the parent and the child
-    parent = arrow[0][0]
-    child = arrow[0][1]
-    p0c1 = (np.logical_and(np.logical_not(training_data[:,parent]),training_data[:,child]).sum()+1)/(m+4)
-    p1c0 = (np.logical_and(training_data[:,parent], np.logical_not(training_data[:,child])).sum()+1)/(m+4)
-    p1c1 = (np.logical_and(training_data[:,parent], training_data[:,child]).sum()+1)/(m+4)
-    p0c0 = 1 - p0c1 -p1c0 -p1c1
-    theta_c_given_p = [p0c0/p_0[parent], p0c1/p_0[parent], p1c0/p_1[parent], p1c1/p_1[parent] ]
-    BN[arrow[0]] = np.array(theta_c_given_p)
-    #print(arrow[0])
-    #print(p0c0, p0c1,p1c0,p1c1)
-#Estimation LogLikehood of the testing set: testing_data
-#Rememebe that the variable 0 is the root of the tree
-log_likehood = 0
-m_testing_values = testing_data.shape[0]
-counting_true = testing_data[:,0].sum()
-counting_false = m_testing_values - counting_true 
-count = np.array([counting_false, counting_true])
-log_theta_root = np.log10(BN[0])
-log_likehood = np.multiply(count, log_theta_root).sum()
-BN_no_root = BN.copy()
-del BN_no_root[0]
-for dependency in BN_no_root:
-    #For te tuples(x,y)
-    x = dependency[0]
-    y = dependency[1]
-    log_theta = np.log10(BN_no_root[dependency])
-    count11 =np.logical_and(testing_data[:,x], testing_data[:,y]).sum()
-    count10 =np.logical_and(testing_data[:,x], np.logical_not(testing_data[:,y])).sum()
-    count01 =np.logical_and(np.logical_not(testing_data[:,x]), testing_data[:,y]).sum()
-    count00 = m_testing_values -count01 -count10 -count11
-    count = np.array([count00,count01,count10,count11])
-    log_likehood += np.multiply(count, log_theta).sum()
-
-print('For option ', options[option][1],' the Log10 Likehood is: ')
-print(log_likehood)
+print('The program will get the log10 likehood of the test_data for each dataset...\n')
+for option in options:
+        
+    selected_dataset = options[option]
+    training_filename = directory + '\\' +selected_dataset[0]
+    testing_filename = directory +  '\\' +selected_dataset[1]
+    validation_filename = directory + '\\' + selected_dataset[2]
+    
+    training_data = np.loadtxt(training_filename , delimiter = ',')
+    testing_data = np.loadtxt(testing_filename , delimiter = ',')
+    validation_data = np.loadtxt(validation_filename , delimiter = ',')
+    
+    #Getting the parameters of the data 
+    #the number of training examples:
+    m = training_data.shape[0]
+    #the number of variables in the Bayes Net
+    n = training_data.shape[1]
+    
+    #initialize the mutual information MI, a nxn square matrix with zeros
+    MI = np.zeros((n, n))
+    #get the indexes of the triangular matrix with 1 offset
+    index_of_tri = np.triu_indices(n,1)
+    #the parameters theta are:
+    p_1 = (training_data.sum(axis = 0)+1)/(m+2)
+    p_0 = 1 - p_1
+    #Now we build our complete graph with mutual information 
+    mut_info_list = []
+    for row_index in range(n-1):
+        for column_index in range(row_index+1,n):
+            #We get the mutual information but store the negative because we need the max spanning tree
+            mut_info_list.append(-mutual_info(training_data,row_index,column_index,p_1[row_index],p_1[column_index], m))
+    
+    MI[index_of_tri] = mut_info_list
+    #the algorithm will understand the triangle is undirected
+    Tcsr = minimum_spanning_tree(MI)
+    #Set the starting porint of the Max Spaning tree as the variable 0
+    DFS_tree = depth_first_tree(-Tcsr, 0, directed=False)
+    #We extract the dependencies
+    a = DFS_tree.todok().items()
+    #initialize the Bayes Net
+    BN = {}
+    BN[0] = np.array([p_0[0], p_1[0]])
+    for arrow in a:
+        #specifie the index of the parent and the child
+        parent = arrow[0][0]
+        child = arrow[0][1]
+        p0c1 = (np.logical_and(np.logical_not(training_data[:,parent]),training_data[:,child]).sum()+1)/(m+4)
+        p1c0 = (np.logical_and(training_data[:,parent], np.logical_not(training_data[:,child])).sum()+1)/(m+4)
+        p1c1 = (np.logical_and(training_data[:,parent], training_data[:,child]).sum()+1)/(m+4)
+        p0c0 = 1 - p0c1 -p1c0 -p1c1
+        p_c0_given_p_0 = p0c0/p_0[parent]
+        p_c0_given_p_1 = p1c0/p_1[parent]
+        
+        theta_c_given_p = [p_c0_given_p_0, 1 - p_c0_given_p_0, p_c0_given_p_1, 1 - p_c0_given_p_1] 
+        BN[arrow[0]] = np.array(theta_c_given_p)
+        #print(arrow[0])
+        #print(p_0[parent],p_1[parent])
+        #print(p0c0, p0c1,p1c0,p1c1)
+    
+    
+    
+    #Estimation LogLikehood of the testing set: testing_data
+    #Rememebe that the variable 0 is the root of the tree
+    log_likehood = 0
+    #testing_data = testing_data[0:1,:]
+    m_testing_values = testing_data.shape[0]
+    counting_true = testing_data[:,0].sum()
+    counting_false = m_testing_values - counting_true 
+    
+    #only for testing
+    #counting_true =
+    #counting_false =
+    #end o testing
+    
+    
+    
+    count = np.array([counting_false, counting_true])
+    log_theta_root = np.log10(BN[0])
+    #print('For the root 0:\n',count,'\n',log_theta_root)
+    log_likehood = np.multiply(count, log_theta_root).sum()
+    BN_no_root = BN.copy()
+    del BN_no_root[0]
+    for dependency in BN_no_root:
+        #print (dependency)
+        #in meand each edge is a tuple tuples(x,y)
+        x = dependency[0]
+        y = dependency[1]
+        log_theta = np.log10(BN_no_root[dependency])
+        #print(log_theta)
+        count11 =np.logical_and(testing_data[:,x], testing_data[:,y]).sum()
+        count10 =np.logical_and(testing_data[:,x], np.logical_not(testing_data[:,y])).sum()
+        count01 =np.logical_and(np.logical_not(testing_data[:,x]), testing_data[:,y]).sum()
+        count00 = m_testing_values -count01 -count10 -count11
+        count = np.array([count00,count01,count10,count11])
+        #print(count00,count01,count10,count11)
+        log_likehood += np.multiply(count, log_theta).sum()
+    
+    print('For option ', option , options[option][1],' the Log10 Likehood is: ')
+    print(log_likehood)
+    
+print('\n......[Done]')

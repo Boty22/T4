@@ -12,8 +12,7 @@ The following datasets are included in "\\data" file
 (6) jester
 (7) bnetflix
 (8) accidents
-(9) r52
-(10) dna
+(9) dna
 
 """
 import numpy as np
@@ -35,34 +34,39 @@ dna = ['dna.ts.data','dna.test.data','dna.valid.data']
 
 options = {1:nltcs, 2:msnbc, 3:kdd, 4:plants, 5:baudio, 6:jester, 7:bnetflix, 8:accidents, 9: dna}
 
-option =  1
-selected_dataset = options[option]
-training_filename = directory + '\\' +selected_dataset[0]
-testing_filename = directory +  '\\' +selected_dataset[1]
-validation_filename = directory + '\\' + selected_dataset[2]
+#option =  1
+print('The program will build the model for all datasets...')
 
-print(testing_filename)
-training_data = np.loadtxt(training_filename , delimiter = ',')
-testing_data = np.loadtxt(testing_filename , delimiter = ',')
-validation_data = np.loadtxt(validation_filename , delimiter = ',')
+for option in options: 
+    selected_dataset = options[option]
+    training_filename = directory + '\\' +selected_dataset[0]
+    testing_filename = directory +  '\\' +selected_dataset[1]
+    validation_filename = directory + '\\' + selected_dataset[2]
+    
+    print(testing_filename)
+    training_data = np.loadtxt(training_filename , delimiter = ',')
+    testing_data = np.loadtxt(testing_filename , delimiter = ',')
+    validation_data = np.loadtxt(validation_filename , delimiter = ',')
+    
+    #Getting the parameters of the data 
+    
+    #the number of training examples:
+    m = training_data.shape[0]
+    
+    #the number of variables in the Bayes Net
+    n = training_data.shape[1]
+    
+    #the parameters theta are:
+    theta_1 = (training_data.sum(axis = 0)+1)/(m+2)
+    log_theta_1 = np.log10(theta_1)
+    log_theta_0 = np.log10(1- theta_1)
+    
+    #Estimation LogLikehood of the testing set:
+    m_test = testing_data.shape[0] 
+    counting_1 = testing_data.sum(axis = 0)
+    counting_0 = m_test - counting_1
+    log_likehood = np.multiply(log_theta_1,counting_1).sum()+np.multiply(log_theta_0,counting_0).sum()
+    print('For option', option, options[option][1],', the Log10 Likehood is: ')
+    print(round(log_likehood,2))
 
-#Getting the parameters of the data 
-
-#the number of training examples:
-m = training_data.shape[0]
-
-#the number of variables in the Bayes Net
-n = training_data.shape[1]
-
-#the parameters theta are:
-theta_1 = (training_data.sum(axis = 0)+1)/(m+2)
-log_theta_1 = np.log10(theta_1)
-log_theta_0 = np.log10(1- theta_1)
-
-#Estimation LogLikehood of the testing set:
-m_test = testing_data.shape[0] 
-counting_1 = testing_data.sum(axis = 0)
-counting_0 = m_test - counting_1
-log_likehood = np.multiply(log_theta_1,counting_1).sum()+np.multiply(log_theta_0,counting_0).sum()
-print('For option ', options[option][1],' the Log10 Likehood is: ')
-print(log_likehood)
+print('......[Done]')
