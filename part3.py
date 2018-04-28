@@ -63,6 +63,44 @@ def read_dataset(option):
     validation_data = np.loadtxt(validation_filename , delimiter = ',', dtype=bool)
     return training_data, testing_data, validation_data
 
+#Methods to create random trees Bayes Net
+def complete_tree_BN(n):
+    BN = {}
+    r = np.random.rand()
+    BN[0] = [r,1-r]
+    for row in range(n):
+        if 2*row+1 < n:
+            r1 = np.random.rand()
+            r2 = np.random.rand()
+            BN[(row,2*row+1)] = [r1, 1-r1, r2, 1-r2]
+        else:
+            break
+        if 2*row+2 < n:
+            r1 = np.random.rand()
+            r2 = np.random.rand()
+            BN[(row,2*row+2)] = [r1, 1-r1, r2, 1-r2]
+        else:
+            break
+    return BN
+
+def unbalanced_tree_BN(n):
+    BN = {}
+    r = np.random.rand()
+    BN[0] = [r,1-r]
+    for row in range(0,n,2):
+        if row+1 < n:
+            r1 = np.random.rand()
+            r2 = np.random.rand()
+            BN[(row,row+1)] = [r1, 1-r1, r2, 1-r2]
+        else:
+            break
+        if row+2 < n:
+            r1 = np.random.rand()
+            r2 = np.random.rand()
+            BN[(row,row+2)] = [r1, 1-r1, r2, 1-r2]
+        else:
+            break
+    return BN
 
 #Subrutine to create a Chow-Liu Tree
 def chow_liu_tree(A):
@@ -79,6 +117,8 @@ def chow_liu_tree(A):
     index_of_tri = np.triu_indices(n,1)
     #the parameters theta are:
     p_1 = (A.sum(axis = 0)+1)/(m+2)
+    #if(p_1>1):
+    #    print('Error p_1 > 1 in chow_liu_tree Rutine ')
     p_0 = 1 - p_1
     #Now we build our complete graph with mutual information 
     mut_info_list = []
@@ -146,7 +186,7 @@ def weighted_mutual_info(A, H, x, u, px, pu, total):
     p_10 = (H[index_x1u0].sum()+1)/(total+4)
     p_11 = (H[index_x1u1].sum()+1)/(total+4)
     p_00 = 1 - p_01 - p_10 - p_11
-    #print (p_00,p_01,p_10,p_11)
+    #print (px,pu,p_00,p_01,p_10,p_11)
     #We now have all the necessary parameters
     mi = p_00 * np.log10(p_00/(1-px)/(1-pu))+ \
             p_01 * np.log10(p_01/(1-px)/(pu))+ \
@@ -155,14 +195,14 @@ def weighted_mutual_info(A, H, x, u, px, pu, total):
     return mi    
 
 
-def weighted_chow_liu_tree(A,H):
+def weighted_chow_liu_tree(A,W):
     #A is the trainign data and H the wighths, so len(H)=m
     #Getting the parameters of the data 
     #the number of training examples:
     m = A.shape[0]
     #the number of variables in the Bayes Net
     n = A.shape[1]
-    total = H.sum()
+    total = W.sum()
     #initialize the mutual information MI, a nxn square matrix with zeros
     MI = np.zeros((n, n))
     #get the indexes of the triangular matrix with 1 offset
@@ -171,16 +211,20 @@ def weighted_chow_liu_tree(A,H):
     wp_1_list = []
     for column in range(n):
         index_column_is_1 = A[:,column]
-        wp_column1 = (H[index_column_is_1].sum()+1)/(total+2)
+        wp_column1 = (W[index_column_is_1].sum()+1)/(total+2)
+        if (wp_column1 > 1):
+            print('Error wp_column1 > 1 in weighted_chow_liu_tree Rutine')
         wp_1_list.append(wp_column1)
     wp_1 = np.array(wp_1_list)
+    
     wp_0 = 1 - wp_1
+    #print(wp_1)
     #Now we build our complete graph with mutual information 
     mut_info_list = []
     for row_index in range(n-1):
         for column_index in range(row_index+1,n):
             #We get the mutual information but store the negative because we need the max spanning tree
-            mut_info_list.append(-weighted_mutual_info(A,H,row_index,column_index,wp_1[row_index],wp_1[column_index], total))
+            mut_info_list.append(- weighted_mutual_info(A,W,row_index,column_index,wp_1[row_index],wp_1[column_index], total))
 
     MI[index_of_tri] = mut_info_list
     #the algorithm will understand the triangle is undirected
@@ -189,7 +233,12 @@ def weighted_chow_liu_tree(A,H):
     DFS_tree = depth_first_tree(-Tcsr, 0, directed=False)
     #We extract the dependencies
     a = DFS_tree.todok().items()
+    #print(a)
     #initialize the Bayes Net
+    p_1 = (A.sum(axis = 0)+1)/(m+2)
+    #if(p_1>1):
+    #    print('Error p_1 > 1 in chow_liu_tree Rutine ')
+    p_0 = 1 - p_1
     BN = {}
     BN[0] = np.array([wp_0[0], wp_1[0]])
     for arrow in a:
@@ -200,7 +249,9 @@ def weighted_chow_liu_tree(A,H):
         p1c0 = (np.logical_and(A[:,parent], np.logical_not(A[:,child])).sum()+1)/(m+4)
         p1c1 = (np.logical_and(A[:,parent], A[:,child]).sum()+1)/(m+4)
         p0c0 = 1 - p0c1 -p1c0 -p1c1
-        theta_c_given_p = [p0c0/wp_0[parent], p0c1/wp_0[parent], p1c0/wp_1[parent], p1c1/wp_1[parent] ]
+        if(p0c0<0):
+            print('Possible errorin  parameter p0c0 of weighter chow liu tree')
+        theta_c_given_p = [p0c0/p_0[parent], p0c1/p_0[parent], p1c0/p_1[parent], p1c1/p_1[parent] ]
         BN[arrow[0]] = np.array(theta_c_given_p)
     return BN
 
@@ -213,12 +264,12 @@ print('Reading Data....', end=' ')
 training_data, testing_data, validation_data = read_dataset(option)
 
 #Define k the number of trees
-k=3
+k=5
 m = training_data.shape[0]
     #the number of variables in the Bayes Net
 n = training_data.shape[1]
 print('[Done]')
-print('Geting random trees....', end=' ')
+print('Initializing data (getting random trees and P.......', end=' ')
 #I decided to initialize the trees using bootstraps of the data
 tree_components=[]
 for component in range(k):
@@ -226,109 +277,143 @@ for component in range(k):
     BN = chow_liu_tree(A)
     tree_components.append(BN)
 print('[Done]')
-print('Weighing data....')
+
+
+P = np.random.rand(k)
+P = P/P.sum()
+
 #Now comes the E Step. 
 #iNITIALIZE P
-P = np.ones(k)*1/k
-#Construct the matriz H of (Weights of the data)
-#Build column y column a k matrix to compute the H
-H_not_normalized = np.zeros((m,k))
+previous_log_likehood=-1000000000000
+log_likehood = -100000000
 
-for tree_index in range(len(tree_components)):
-    pre_H=np.zeros((m, len(tree_components[tree_index])))
-    #print('\nWorking with tree:')
-    #print(tree_components[tree_index])
-    #For the root
-    edge_number = 1 #Do not start at 0 because, 0 is the column for the root
-    print('Getting parameters for tree ',tree_index)
-    for key in tree_components[tree_index]:
-        #print(key)
-        #For the root
-        
-        if  (key== 0):
-            #Ex: {0: array([0.85423101, 0.14576899])
-            q_root_1 = tree_components[tree_index][key][1]
-            q_root_0 = 1 - q_root_1
-            print(q_root_0,q_root_1)
-            index_root_0 = np.logical_not(training_data[:,0])
-            index_root_1 = training_data[:,0]
-            pre_H[:,0][index_root_0] = q_root_0
-            pre_H[:,0][index_root_1] = q_root_1
-            
-        #For the rest of the variables 
-        else:
-            
-            #Ex: (6, 1): array([0.90998646, 0.08981794, 0.44442595, 0.55610812])
-            parent = key[0]
-            child = key[1]
-            q_p0c0 = tree_components[tree_index][key][0]
-            q_p0c1 = 1 - q_p0c0
-            q_p1c0 = tree_components[tree_index][key][2]
-            q_p1c1 = 1 - q_p1c0
-            print(q_p0c0, q_p0c1, q_p1c0, q_p1c1)
-            index_p0c0 = np.logical_and(np.logical_not(training_data[:,parent]), np.logical_not(training_data[:,child]))
-            index_p0c1 = np.logical_and(np.logical_not(training_data[:,parent]), training_data[:,child])
-            index_p1c0 = np.logical_and(training_data[:,parent], np.logical_not(training_data[:,child]))
-            index_p1c1 = np.logical_and(training_data[:,parent],training_data[:,child])
-            pre_H[:,edge_number][index_p0c0] = q_p0c0 #np.log10(q_p0c0)
-            pre_H[:,edge_number][index_p0c1] = q_p0c1 #np.log10(q_p0c1)
-            pre_H[:,edge_number][index_p1c0] = q_p1c0 #np.log10(q_p1c0)
-            pre_H[:,edge_number][index_p1c1] = q_p1c1 #np.log10(q_p1c1)
-            edge_number += 1
-    #H_not_normalized in te column (tree_index) must be the product of all the columns in pre_H
-    H_not_normalized[:,tree_index] = P[tree_index]*np.prod(pre_H, axis=1)
+while abs(abs(log_likehood)-abs(previous_log_likehood)) > 100:
+    previous_log_likehood = log_likehood
 
-
-print('....................[Done]')
-#End of the for loop over all the trees
+    print('Weighing data....', end='')
+    #Construct the matriz H of (Weights of the data)
+    #Build column y column a k matrix to compute the H
+    H_not_normalized = np.zeros((m,k))
     
-#Now normalize the in a matrix H
-H = H_not_normalized/H_not_normalized.sum(axis=1,keepdims=1)
-
-#update your model
-P = H.sum(axis=0)/m
-tree_components=[]
-for component in range(k):
-    BN =  weighted_chow_liu_tree(training_data, H[:,component])
-    tree_components.append(BN)
-
-
-
-#Now I need the mutual Information with weighted data
+    for tree_index in range(len(tree_components)):
+        pre_H=np.zeros((m, len(tree_components[tree_index])))
+        #print('\nWorking with tree:')
+        #print(tree_components[tree_index])
+        #For the root
+        edge_number = 1 #Do not start at 0 because, 0 is the column for the root
+        #print('Getting parameters for tree ',tree_index)
+        pk = P[tree_index]
+        for key in tree_components[tree_index]:
+            #print(key)
+            #For the root
             
+            if  (key== 0):
+                #Ex: {0: array([0.85423101, 0.14576899])
+                q_root_1 = tree_components[tree_index][key][1]
+                if (q_root_1>1):
+                    print('*******Prob q_root_1 >1 error*******')
+                q_root_0 = 1 - q_root_1
+                #print(q_root_0,q_root_1)
+                index_root_0 = np.logical_not(training_data[:,0])
+                index_root_1 = training_data[:,0]
+                pre_H[:,0][index_root_0] = q_root_0
+                pre_H[:,0][index_root_1] = q_root_1
+                
+            #For the rest of the variables 
+            else:
+                
+                #Ex: (6, 1): array([0.90998646, 0.08981794, 0.44442595, 0.55610812])
+                parent = key[0]
+                child = key[1]
+                q_p0c0 = tree_components[tree_index][key][0]
+                if (q_p0c0>1):
+                    print('*******Prob q_p0c0  >1 error*******')
+                q_p0c1 = 1 - q_p0c0
+                q_p1c0 = tree_components[tree_index][key][2]
+                if (q_p1c0>1):
+                    print('*******Prob q_p1c0>1 error*******')
+                q_p1c1 = 1 - q_p1c0
+                #print(q_p0c0, q_p0c1, q_p1c0, q_p1c1)
+                index_p0c0 = np.logical_and(np.logical_not(training_data[:,parent]), np.logical_not(training_data[:,child]))
+                index_p0c1 = np.logical_and(np.logical_not(training_data[:,parent]), training_data[:,child])
+                index_p1c0 = np.logical_and(training_data[:,parent], np.logical_not(training_data[:,child]))
+                index_p1c1 = np.logical_and(training_data[:,parent],training_data[:,child])
+                pre_H[:,edge_number][index_p0c0] = q_p0c0 #np.log10(q_p0c0)
+                pre_H[:,edge_number][index_p0c1] = q_p0c1 #np.log10(q_p0c1)
+                pre_H[:,edge_number][index_p1c0] = q_p1c0 #np.log10(q_p1c0)
+                pre_H[:,edge_number][index_p1c1] = q_p1c1 #np.log10(q_p1c1)
+                edge_number += 1
+        #H_not_normalized in te column (tree_index) must be the product of all the columns in pre_H
+        H_not_normalized[:,tree_index] = pk*np.prod(pre_H, axis=1)
+        
+        '''
+        #mimi = H_not_normalized<0
+        #print('\n*******************Posible error*****************')
+        #print(H_not_normalized[mimi])
+        '''
+    
+
+    #End of the for loop over all the trees
+    #Now normalize the in a matrix H
+    H = H_not_normalized/H_not_normalized.sum(axis=1,keepdims=1)
+    print('....................[Done]')
+
+    '''
+    mimi = H<0
+    print('\n*******************Posible error*****************')
+    print(H[mimi])
+    '''
+
+    print('Updating Model...\n', end='')
+    
+    #update your model
+    P = H.sum(axis=0)/m
+    P = P/P.sum()
+    tree_components=[]
+    for component in range(k):
+        BN={}
+        #print('The tree number', component,' is:')
+        BN =  weighted_chow_liu_tree(training_data, H[:,component])
+        tree_components.append(BN)
+    
+    print('[Done]')
+    
+    print('Calculating log_likehood of new model: ', end='')
+    #Now I need the mutual Information with weighted data
+    #Estimation LogLikehood validation set: validation_data
+    #Rememebe that the variable 0 is the root of the tree
+    log_likehood = 0
+    m_validation_values = validation_data.shape[0]
+    
+    #for each tree
+    for component in range(k):
+        BN = tree_components[component]
+        pk = P[component]
+        log_likehood += np.log10(pk)
+        counting_true = validation_data[:,0].sum()
+        counting_false = m_validation_values - counting_true 
+        count = np.array([counting_false, counting_true])
+        #print(BN[0],type(BN[0]))
+        log_theta_root = np.log10(BN[0])
+        log_likehood += np.multiply(count, log_theta_root).sum()
+        BN_no_root = BN.copy()
+        del BN_no_root[0]
+        for dependency in BN_no_root:
+            #For te tuples(x,y)
+            x = dependency[0]
+            y = dependency[1]
+            log_theta = np.log10(BN_no_root[dependency])
+            count11 =np.logical_and(validation_data[:,x], validation_data[:,y]).sum()
+            count10 =np.logical_and(validation_data[:,x], np.logical_not(validation_data[:,y])).sum()
+            count01 =np.logical_and(np.logical_not(validation_data[:,x]), validation_data[:,y]).sum()
+            count00 = m_validation_values -count01 -count10 -count11
+            count = np.array([count00,count01,count10,count11])
+            log_likehood += np.multiply(count, log_theta).sum()
+    
+    print(log_likehood, end='')  
+    print(' ...[Done]')
 
 
-
-
-
-
-#Estimation LogLikehood validation set: validation_data
-#Rememebe that the variable 0 is the root of the tree
-log_likehood = 0
-m_validation_values = validation_data.shape[0]
-
-#for each tree
-for component in range(k):
-    BN = tree_components[component]
-    pk = P[component]
-    counting_true = validation_data[:,0].sum()
-    counting_false = m_validation_values - counting_true 
-    count = np.array([counting_false, counting_true])
-    log_theta_root = np.log10(BN[0])
-    log_likehood += pk*np.multiply(count, log_theta_root).sum()
-    BN_no_root = BN.copy()
-    del BN_no_root[0]
-    for dependency in BN_no_root:
-        #For te tuples(x,y)
-        x = dependency[0]
-        y = dependency[1]
-        log_theta = np.log10(BN_no_root[dependency])
-        count11 =np.logical_and(validation_data[:,x], validation_data[:,y]).sum()
-        count10 =np.logical_and(validation_data[:,x], np.logical_not(validation_data[:,y])).sum()
-        count01 =np.logical_and(np.logical_not(validation_data[:,x]), validation_data[:,y]).sum()
-        count00 = m_validation_values -count01 -count10 -count11
-        count = np.array([count00,count01,count10,count11])
-        log_likehood += pk*np.multiply(count, log_theta).sum()
 
 print('For iteration ', 1,' the Log10 Likehood is: ')
 print(log_likehood)
