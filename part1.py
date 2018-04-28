@@ -35,7 +35,7 @@ dna = ['dna.ts.data','dna.test.data','dna.valid.data']
 
 options = {1:nltcs, 2:msnbc, 3:kdd, 4:plants, 5:baudio, 6:jester, 7:bnetflix, 8:accidents, 9: dna}
 
-option =  8
+option =  1
 selected_dataset = options[option]
 training_filename = directory + '\\' +selected_dataset[0]
 testing_filename = directory +  '\\' +selected_dataset[1]
@@ -60,9 +60,9 @@ log_theta_1 = np.log10(theta_1)
 log_theta_0 = np.log10(1- theta_1)
 
 #Estimation LogLikehood of the testing set:
-
+m_test = testing_data.shape[0] 
 counting_1 = testing_data.sum(axis = 0)
-counting_0 = m - counting_1
+counting_0 = m_test - counting_1
 log_likehood = np.multiply(log_theta_1,counting_1).sum()+np.multiply(log_theta_0,counting_0).sum()
 print('For option ', options[option][1],' the Log10 Likehood is: ')
 print(log_likehood)

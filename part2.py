@@ -54,7 +54,7 @@ options = {1:nltcs, 2:msnbc, 3:kdd, 4:plants, 5:baudio, 6:jester, 7:bnetflix, 8:
 
 
 
-option =  9
+option =  1
 
 
 
@@ -108,7 +108,8 @@ for arrow in a:
     p0c0 = 1 - p0c1 -p1c0 -p1c1
     theta_c_given_p = [p0c0/p_0[parent], p0c1/p_0[parent], p1c0/p_1[parent], p1c1/p_1[parent] ]
     BN[arrow[0]] = np.array(theta_c_given_p)
-
+    #print(arrow[0])
+    #print(p0c0, p0c1,p1c0,p1c1)
 #Estimation LogLikehood of the testing set: testing_data
 #Rememebe that the variable 0 is the root of the tree
 log_likehood = 0
