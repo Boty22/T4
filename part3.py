@@ -264,7 +264,7 @@ print('Reading Data....', end=' ')
 training_data, testing_data, validation_data = read_dataset(option)
 
 #Define k the number of trees
-k=5
+k=30
 m = training_data.shape[0]
     #the number of variables in the Bayes Net
 n = training_data.shape[1]
@@ -273,8 +273,13 @@ print('Initializing data (getting random trees and P.......', end=' ')
 #I decided to initialize the trees using bootstraps of the data
 tree_components=[]
 for component in range(k):
-    A = bootstrap_resample(training_data,0.1)
-    BN = chow_liu_tree(A)
+    if component % 3==0:
+        A = bootstrap_resample(training_data,0.4)
+        BN = chow_liu_tree(A)
+    elif component % 3==1:
+        BN = complete_tree_BN(n)
+    else:
+        BN = unbalanced_tree_BN(n)
     tree_components.append(BN)
 print('[Done]')
 
@@ -287,7 +292,7 @@ P = P/P.sum()
 previous_log_likehood=-1000000000000
 log_likehood = -100000000
 
-while abs(abs(log_likehood)-abs(previous_log_likehood)) > 100:
+while abs(abs(log_likehood)-abs(previous_log_likehood)) > 10:
     previous_log_likehood = log_likehood
 
     print('Weighing data....', end='')
