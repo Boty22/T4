@@ -131,6 +131,79 @@ def bootstrap_resample(X, percentage=None):
     return X_resample
 
 
+def weighted_mutual_info(A, H, x, u, px, pu, total):
+    #total is the sum over H
+    #The following .sum() do not require ".sum(axis = 0)" because they are one-dimentional
+    #Get the indexes:
+    #index_x0u0 = np.logical_and(np.logical_not(A[:,x]), np.logical_not(A[:,u]))
+    index_x0u1 = np.logical_and(np.logical_not(A[:,x]), A[:,u])
+    index_x1u0 = np.logical_and(A[:,x], np.logical_not(A[:,u]))
+    index_x1u1 = np.logical_and(A[:,x],A[:,u])
+    
+    
+    
+    p_01 = (H[index_x0u1].sum()+1)/(total+4)
+    p_10 = (H[index_x1u0].sum()+1)/(total+4)
+    p_11 = (H[index_x1u1].sum()+1)/(total+4)
+    p_00 = 1 - p_01 - p_10 - p_11
+    #print (p_00,p_01,p_10,p_11)
+    #We now have all the necessary parameters
+    mi = p_00 * np.log10(p_00/(1-px)/(1-pu))+ \
+            p_01 * np.log10(p_01/(1-px)/(pu))+ \
+            p_10 * np.log10(p_10/(px)/(1-pu))+ \
+            p_11 * np.log10(p_11/(px)/(pu))
+    return mi    
+
+
+def weighted_chow_liu_tree(A,H):
+    #A is the trainign data and H the wighths, so len(H)=m
+    #Getting the parameters of the data 
+    #the number of training examples:
+    m = A.shape[0]
+    #the number of variables in the Bayes Net
+    n = A.shape[1]
+    total = H.sum()
+    #initialize the mutual information MI, a nxn square matrix with zeros
+    MI = np.zeros((n, n))
+    #get the indexes of the triangular matrix with 1 offset
+    index_of_tri = np.triu_indices(n,1)
+    #the parameters theta are:
+    wp_1_list = []
+    for column in range(n):
+        index_column_is_1 = A[:,column]
+        wp_column1 = (H[index_column_is_1].sum()+1)/(total+2)
+        wp_1_list.append(wp_column1)
+    wp_1 = np.array(wp_1_list)
+    wp_0 = 1 - wp_1
+    #Now we build our complete graph with mutual information 
+    mut_info_list = []
+    for row_index in range(n-1):
+        for column_index in range(row_index+1,n):
+            #We get the mutual information but store the negative because we need the max spanning tree
+            mut_info_list.append(-weighted_mutual_info(A,H,row_index,column_index,wp_1[row_index],wp_1[column_index], total))
+
+    MI[index_of_tri] = mut_info_list
+    #the algorithm will understand the triangle is undirected
+    Tcsr = minimum_spanning_tree(MI)
+    #Set the starting porint of the Max Spaning tree as the variable 0
+    DFS_tree = depth_first_tree(-Tcsr, 0, directed=False)
+    #We extract the dependencies
+    a = DFS_tree.todok().items()
+    #initialize the Bayes Net
+    BN = {}
+    BN[0] = np.array([wp_0[0], wp_1[0]])
+    for arrow in a:
+        #specifie the index of the parent and the child
+        parent = arrow[0][0]
+        child = arrow[0][1]
+        p0c1 = (np.logical_and(np.logical_not(A[:,parent]),A[:,child]).sum()+1)/(m+4)
+        p1c0 = (np.logical_and(A[:,parent], np.logical_not(A[:,child])).sum()+1)/(m+4)
+        p1c1 = (np.logical_and(A[:,parent], A[:,child]).sum()+1)/(m+4)
+        p0c0 = 1 - p0c1 -p1c0 -p1c1
+        theta_c_given_p = [p0c0/wp_0[parent], p0c1/wp_0[parent], p1c0/wp_1[parent], p1c1/wp_1[parent] ]
+        BN[arrow[0]] = np.array(theta_c_given_p)
+    return BN
+
 
 #this is the main
 
@@ -149,7 +222,7 @@ print('Geting random trees....', end=' ')
 #I decided to initialize the trees using bootstraps of the data
 tree_components=[]
 for component in range(k):
-    A = bootstrap_resample(training_data,0.35)
+    A = bootstrap_resample(training_data,0.1)
     BN = chow_liu_tree(A)
     tree_components.append(BN)
 print('[Done]')
@@ -211,107 +284,51 @@ print('....................[Done]')
     
 #Now normalize the in a matrix H
 H = H_not_normalized/H_not_normalized.sum(axis=1,keepdims=1)
+
+#update your model
 P = H.sum(axis=0)/m
-            
+tree_components=[]
+for component in range(k):
+    BN =  weighted_chow_liu_tree(training_data, H[:,component])
+    tree_components.append(BN)
+
+
+
 #Now I need the mutual Information with weighted data
             
-def weighted_mutual_info(A, H, x, u, px, pu, total):
-    #total is the sum over H
-    #The following .sum() do not require ".sum(axis = 0)" because they are one-dimentional
-    #Get the indexes:
-    #index_x0u0 = np.logical_and(np.logical_not(A[:,x]), np.logical_not(A[:,u]))
-    index_x0u1 = np.logical_and(np.logical_not(A[:,x]), A[:,u])
-    index_x1u0 = np.logical_and(A[:,x], np.logical_not(A[:,u]))
-    index_x1u1 = np.logical_and(A[:,x],A[:,u])
-    
-    
-    
-    p_01 = (H[index_x0u1].sum()+1)/(total+4)
-    p_10 = (H[index_x1u0].sum()+1)/(total+4)
-    p_11 = (H[index_x1u1].sum()+1)/(total+4)
-    p_00 = 1 - p_01 - p_10 - p_11
-    #print (p_00,p_01,p_10,p_11)
-    #We now have all the necessary parameters
-    mi = p_00 * np.log10(p_00/(1-px)/(1-pu))+ \
-            p_01 * np.log10(p_01/(1-px)/(pu))+ \
-            p_10 * np.log10(p_10/(px)/(1-pu))+ \
-            p_11 * np.log10(p_11/(px)/(pu))
-    return mi    
-
-
-def weighted_chow_liu_tree(A,H):
-    #A is the trainign data and H the wighths, so len(H)=m
-    #Getting the parameters of the data 
-    #the number of training examples:
-    m = A.shape[0]
-    #the number of variables in the Bayes Net
-    n = A.shape[1]
-    total = H.sum()
-    #initialize the mutual information MI, a nxn square matrix with zeros
-    MI = np.zeros((n, n))
-    #get the indexes of the triangular matrix with 1 offset
-    index_of_tri = np.triu_indices(n,1)
-    #the parameters theta are:
-    wp_1 = []
-    for column in range(n):
-        wp_column1 = (H[:,column].sum()+1)/(total+2)
-        wp_1.append(wp_column1)
-    wp_0 = 1 - wp_1
-    #Now we build our complete graph with mutual information 
-    mut_info_list = []
-    for row_index in range(n-1):
-        for column_index in range(row_index+1,n):
-            #We get the mutual information but store the negative because we need the max spanning tree
-            mut_info_list.append(-weighted_mutual_info(A,H,row_index,column_index,wp_1[row_index],wp_1[column_index], total))
-
-    MI[index_of_tri] = mut_info_list
-    #the algorithm will understand the triangle is undirected
-    Tcsr = minimum_spanning_tree(MI)
-    #Set the starting porint of the Max Spaning tree as the variable 0
-    DFS_tree = depth_first_tree(-Tcsr, 0, directed=False)
-    #We extract the dependencies
-    a = DFS_tree.todok().items()
-    #initialize the Bayes Net
-    BN = {}
-    BN[0] = np.array([wp_0[0], wp_1[0]])
-    for arrow in a:
-        #specifie the index of the parent and the child
-        parent = arrow[0][0]
-        child = arrow[0][1]
-        p0c1 = (np.logical_and(np.logical_not(A[:,parent]),A[:,child]).sum()+1)/(m+4)
-        p1c0 = (np.logical_and(A[:,parent], np.logical_not(A[:,child])).sum()+1)/(m+4)
-        p1c1 = (np.logical_and(A[:,parent], A[:,child]).sum()+1)/(m+4)
-        p0c0 = 1 - p0c1 -p1c0 -p1c1
-        theta_c_given_p = [p0c0/wp_0[parent], p0c1/wp_0[parent], p1c0/wp_1[parent], p1c1/wp_1[parent] ]
-        BN[arrow[0]] = np.array(theta_c_given_p)
-    return BN
 
 
 
 
 
-#Estimation LogLikehood of the testing set: testing_data
+
+#Estimation LogLikehood validation set: validation_data
 #Rememebe that the variable 0 is the root of the tree
 log_likehood = 0
-m_testing_values = testing_data.shape[0]
-counting_true = testing_data[:,0].sum()
-counting_false = m_testing_values - counting_true 
-count = np.array([counting_false, counting_true])
-log_theta_root = np.log10(BN[0])
-log_likehood = np.multiply(count, log_theta_root).sum()
-BN_no_root = BN.copy()
-del BN_no_root[0]
-for dependency in BN_no_root:
-    #For te tuples(x,y)
-    x = dependency[0]
-    y = dependency[1]
-    log_theta = np.log10(BN_no_root[dependency])
-    count11 =np.logical_and(testing_data[:,x], testing_data[:,y]).sum()
-    count10 =np.logical_and(testing_data[:,x], np.logical_not(testing_data[:,y])).sum()
-    count01 =np.logical_and(np.logical_not(testing_data[:,x]), testing_data[:,y]).sum()
-    count00 = m_testing_values -count01 -count10 -count11
-    count = np.array([count00,count01,count10,count11])
-    log_likehood += np.multiply(count, log_theta).sum()
+m_validation_values = validation_data.shape[0]
 
-print('For option ', option,' the Log10 Likehood is: ')
+#for each tree
+for component in range(k):
+    BN = tree_components[component]
+    pk = P[component]
+    counting_true = validation_data[:,0].sum()
+    counting_false = m_validation_values - counting_true 
+    count = np.array([counting_false, counting_true])
+    log_theta_root = np.log10(BN[0])
+    log_likehood += pk*np.multiply(count, log_theta_root).sum()
+    BN_no_root = BN.copy()
+    del BN_no_root[0]
+    for dependency in BN_no_root:
+        #For te tuples(x,y)
+        x = dependency[0]
+        y = dependency[1]
+        log_theta = np.log10(BN_no_root[dependency])
+        count11 =np.logical_and(validation_data[:,x], validation_data[:,y]).sum()
+        count10 =np.logical_and(validation_data[:,x], np.logical_not(validation_data[:,y])).sum()
+        count01 =np.logical_and(np.logical_not(validation_data[:,x]), validation_data[:,y]).sum()
+        count00 = m_validation_values -count01 -count10 -count11
+        count = np.array([count00,count01,count10,count11])
+        log_likehood += pk*np.multiply(count, log_theta).sum()
+
+print('For iteration ', 1,' the Log10 Likehood is: ')
 print(log_likehood)
